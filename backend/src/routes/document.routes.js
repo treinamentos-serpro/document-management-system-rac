@@ -1,6 +1,26 @@
 const express = require('express');
 const multer = require('multer');
 
+function createUploadRateLimit({ windowMs = 60_000, max = 100 } = {}) {
+  let windowStartedAt = Date.now();
+  let requestCount = 0;
+
+  return (_req, res, next) => {
+    const now = Date.now();
+    if (now - windowStartedAt >= windowMs) {
+      windowStartedAt = now;
+      requestCount = 0;
+    }
+
+    requestCount += 1;
+    if (requestCount > max) {
+      return res.status(429).json({ error: 'Limite de uploads excedido' });
+    }
+
+    return next();
+  };
+}
+
 function createDocumentRouter({ controller, storagePath }) {
   const router = express.Router();
   const upload = multer({
@@ -12,7 +32,7 @@ function createDocumentRouter({ controller, storagePath }) {
     }),
   });
 
-  router.post('/upload', upload.single('file'), controller.upload);
+  router.post('/upload', createUploadRateLimit(), upload.single('file'), controller.upload);
   router.get('/documents', controller.list);
   router.get('/documents/:id/download', controller.download);
   return router;

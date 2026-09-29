@@ -10,6 +10,7 @@
 // usando multer com diskStorage. Não utilize provedores externos.
 
 const express = require('express');
+const fs = require('node:fs');
 const multer = require('multer');
 const path = require('node:path');
 const DocumentRepository = require('./repositories/document.repository');
@@ -20,7 +21,14 @@ const createDocumentRouter = require('./routes/document.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const storagePath = process.env.STORAGE_PATH || path.resolve(__dirname, '../storage');
+const storagePath = process.env.STORAGE_DIR || process.env.STORAGE_PATH || path.resolve(__dirname, '../storage');
+const maxFileSize = Number(process.env.MAX_FILE_SIZE_BYTES ?? 10 * 1024 * 1024);
+
+if (!Number.isSafeInteger(maxFileSize) || maxFileSize <= 0) {
+  throw new Error('MAX_FILE_SIZE_BYTES deve ser um inteiro positivo');
+}
+
+fs.mkdirSync(storagePath, { recursive: true });
 
 const documentService = new DocumentService({
   repository: new DocumentRepository(),
@@ -29,7 +37,7 @@ const documentService = new DocumentService({
 const documentController = new DocumentController({ service: documentService });
 
 app.use(express.json());
-app.use(createDocumentRouter({ controller: documentController, storagePath }));
+app.use(createDocumentRouter({ controller: documentController, storagePath, maxFileSize }));
 
 // Endpoint de verificação de saúde.
 app.get('/health', (req, res) => {
@@ -40,7 +48,14 @@ app.use((error, req, res, next) => {
   if (res.headersSent) return next(error);
 
   if (error instanceof multer.MulterError) {
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'O arquivo excede o tamanho máximo permitido.' });
+    }
     return res.status(400).json({ error: 'Falha no upload do arquivo.' });
+  }
+
+  if (error.statusCode) {
+    return res.status(error.statusCode).json({ error: error.message });
   }
 
   console.error(error);

@@ -14,7 +14,8 @@ function createDocumentRouter({ controller, storagePath }) {
   });
 
   const uploadRateLimiter = rateLimit({ windowMs: 60_000, limit: 100 });
-  router.post('/upload', uploadRateLimiter, upload.single('file'), controller.upload);
+  router.use('/upload', uploadRateLimiter);
+  router.post('/upload', upload.single('file'), controller.upload);
   router.get('/documents', controller.list);
   router.get('/documents/:id/download', controller.download);
   return router;

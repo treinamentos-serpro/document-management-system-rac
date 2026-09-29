@@ -11,11 +11,25 @@
 // usando multer com diskStorage. Não utilize provedores externos.
 
 const express = require('express');
+const path = require('node:path');
+const DocumentRepository = require('./repositories/document.repository');
+const FileRepository = require('./repositories/file.repository');
+const DocumentService = require('./services/document.service');
+const DocumentController = require('./controllers/document.controller');
+const createDocumentRouter = require('./routes/document.routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const storagePath = process.env.STORAGE_PATH || path.resolve(__dirname, '../storage');
+
+const documentService = new DocumentService({
+  repository: new DocumentRepository(),
+  fileRepository: new FileRepository(storagePath),
+});
+const documentController = new DocumentController({ service: documentService });
 
 app.use(express.json());
+app.use(createDocumentRouter({ controller: documentController, storagePath }));
 
 // Endpoint de verificação de saúde. As demais rotas (/upload, /documents,
 // /documents/:id/download) serão implementadas durante o Passo 2.
